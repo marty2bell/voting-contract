@@ -3,13 +3,12 @@
 pragma solidity >=0.7.0 <0.9.0;
 
 contract Election{
-    
-    struct Candidate{
-        uint id;
-        string name;
-        uint voteCount;
-    }
 
+    string public name;
+    string[] public candidates;
+    uint public seats; 
+    uint public startTime;
+    uint public endTime;
 
     struct PreferenceVotes {
         uint first;
@@ -17,31 +16,23 @@ contract Election{
         uint[] third;
     }
 
-    PreferenceVotes[] public candidatePreferenceVotes;
+    PreferenceVotes[] private candidatePreferenceVotes;
 
-    string[] public candidates;
-    uint public candidatesStanding;
+    mapping (address => bool) public voters;
+    mapping (address => uint) public approvedVotingCentres;
 
-    mapping (uint => Candidate) public candidateMap; // may not need
-
-    string private _election_name;
-
-    uint private _candidatesToBeElected; 
-
-    uint private _startTime;
-
-    uint private _endTime;
-
-    mapping (address => bool) public voter;
+    uint public votesCast;
+    uint public electedVoteThreshold;
     
-    constructor(string[] memory electionCandidates, string memory election_name, uint256 candidatesToBeElected, uint256 startTime, uint256 endTime) {
-        _election_name = election_name;
-        _candidatesToBeElected = candidatesToBeElected;
-        _startTime = startTime;
-        _endTime = endTime;
+    constructor(string[] memory electionCandidates, string memory electionName, uint256 numberOfSeats, uint256 electionStartTime, uint256 electionEndTime) {
+        name = electionName;
+        startTime = electionStartTime;
+        endTime = electionEndTime;
+        seats = numberOfSeats;
         candidates = electionCandidates;
-        candidatesStanding = electionCandidates.length;
+        // if number of candidates is less than seats then error -> invalid election 
         setupCandidatesForVoting(electionCandidates);
+        votesCast = 0;
     }
 
     function setupCandidatesForVoting(string[] memory electionCandidates) internal {
@@ -68,28 +59,46 @@ contract Election{
         return initialVotes;
     }
 
+    // return the current number of votes for a given candidate
     function getFirstPreferenceVotes(uint candidateid) public view returns (uint) {
         return candidatePreferenceVotes[candidateid].first;
     }
 
+    // apply vote preferences to the candidate vote counts
+    function vote(uint[] memory preferences) external {
+        // Validation:
+        // Each id must be between 0 and candidates.length
+        // Each id must be unique, can't vote for the same candidate twice
+        // Valid combinations -> x,y,z;x,y;x
+        // The address can be made unique for each vote, but for the sim it will be the same address, so we can add a list of approved votes for special addresses to cover this
 
-    // function initialiseCandidateMapping(string[] memory candidatesStanding) internal {
-    //     Candidate memory candidate;
-    //     for (uint256 i = 0; i < candidatesStanding.length - 1; i++) {
-    //         candidate = Candidate({id: i, name: candidatesStanding[i], voteCount: 0});
-    //         candidateMap[i] = candidate;
-    //         candidateCount = candidatesStanding.length;
-    //     }
-    // }
+        candidatePreferenceVotes[preferences[0]].first++;
+        candidatePreferenceVotes[preferences[0]].second[preferences[1]]++;
+        candidatePreferenceVotes[preferences[0]].third[preferences[2]]++;
+        votesCast++;
+    }
 
-    // function vote(uint _candidateid) public {
-    //     require(_candidateid < candidateCount, "Invalid candidate id");
-    //     //Access structure from Mapping
-    //     Candidate storage candidate = candidateMap[_candidateid];
-    //     //Increment vote count
-    //     candidate.voteCount++;
-    //     //Update structure back in mapping 
-    //     candidateMap[_candidateid] = candidate;
-    // }
+    function calculateResult() external returns (uint) {
+        // Can only be called by the contract Owner after the end time has passed
+        // Can also only be called once
+        electedVoteThreshold = votesCast / seats;
+        // if the elected threshold is 0 or less than 1 then error -> election is invalid
+        uint candidatesElected = 0;
+        bool moreCandidatesToElect = true;
+        bool candidateElected;
+        while (moreCandidatesToElect) {
+            candidateElected = electCandidate();
+            if (candidateElected) {
+                candidatesElected++;
+            }
+            if (candidatesElected == seats || candidateElected == false) {
+                moreCandidatesToElect = false;
+            }
+        }
+        return candidatesElected;
+    }
+
+    function electCandidate() private returns (bool) {
+    }
 
 }
