@@ -78,6 +78,8 @@ contract Election{
         votesCast++;
     }
 
+    // will calculate the result of the election by working out which candidates made the cut
+    // returns the number of candidates elected as in theory not all seats will get filled
     function calculateResult() external returns (uint) {
         // Can only be called by the contract Owner after the end time has passed
         // Can also only be called once
