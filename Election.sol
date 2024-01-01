@@ -11,8 +11,13 @@ contract Election{
     uint public endTime;
 
     struct PreferenceVotes {
+        bool elected;
+        bool eliminated;
+        uint round;
         uint first;
+        uint firstTransfers;
         uint[] second;
+        uint[] secondTransfers;
         uint[] third;
     }
 
@@ -22,8 +27,10 @@ contract Election{
     mapping (address => uint) public approvedVotingCentres;
 
     uint public votesCast;
-    uint public electedVoteThreshold;
+    uint public quota;
     
+    // Need to add events for elected and elinminated
+
     constructor(string[] memory electionCandidates, string memory electionName, uint256 numberOfSeats, uint256 electionStartTime, uint256 electionEndTime) {
         name = electionName;
         startTime = electionStartTime;
@@ -39,13 +46,18 @@ contract Election{
         // Setup default Voting structures
         uint[] memory initialVoteArray = generateInitialVotingArray(electionCandidates);
         PreferenceVotes memory initialPreferenceVotes = PreferenceVotes({
+            elected: false,
+            eliminated: false,
+            round: 0,
             first: 0,
+            firstTransfers: 0,
             second: initialVoteArray,
+            secondTransfers: initialVoteArray,
             third: initialVoteArray
         });
 
         // Setup initial Vote Counts for each Candidate
-        for (uint256 i = 0; i < electionCandidates.length; i++) {
+        for (uint i = 0; i < electionCandidates.length; i++) {
             candidatePreferenceVotes.push(initialPreferenceVotes);
         }
     }
@@ -78,29 +90,54 @@ contract Election{
         votesCast++;
     }
 
-    // will calculate the result of the election by working out which candidates made the cut
-    // returns the number of candidates elected as in theory not all seats will get filled
-    function calculateResult() external returns (uint) {
+    // will calculate the result of the election by working out which candidates made the quota of votes
+    // returns the number of candidates elected
+    function calculateResults() external returns (uint) {
         // Can only be called by the contract Owner after the end time has passed
         // Can also only be called once
-        electedVoteThreshold = votesCast / seats;
+        quota = votesCast / seats;
         // if the elected threshold is 0 or less than 1 then error -> election is invalid
         uint candidatesElected = 0;
-        bool moreCandidatesToElect = true;
-        bool candidateElected;
-        while (moreCandidatesToElect) {
-            candidateElected = electCandidate();
-            if (candidateElected) {
-                candidatesElected++;
-            }
-            if (candidatesElected == seats || candidateElected == false) {
-                moreCandidatesToElect = false;
+        uint votingRound = 1;
+        while (candidatesElected < seats) {
+            candidatesElected += processVotingRound(votingRound);
+        }
+        return candidatesElected;
+    }
+
+
+    // Process any Candidates that have reached the quota to be elected
+    // Are there more candidates remaining than seats ->
+    //  IF YES then eliminate candidate with lowest number of votes
+    //  ELSE Elect remaining candidates
+    function processVotingRound(uint votingRound) private returns (uint) {
+        uint[] memory elected = getCandidatesReachingQuota();
+        for (uint i = 0; i < elected.length; i++) {
+            processElectedCandidate(elected[i], votingRound);
+        }
+        return elected.length;
+    }
+
+    // Cycle through the candidates and return any that have been elected
+    function getCandidatesReachingQuota() private view returns (uint[] memory) {
+        uint[] memory candidatesElected;
+        uint candidate = 0;
+
+        // Find any candidates that have been elected
+        for (uint i = 0; i < candidatePreferenceVotes.length; i++) {
+            if (candidatePreferenceVotes[i].first + candidatePreferenceVotes[i].firstTransfers >= quota && candidatePreferenceVotes[i].elected == false && candidatePreferenceVotes[i].eliminated == false) {
+                candidatesElected[candidate] = i;
+                candidate++;
             }
         }
         return candidatesElected;
     }
 
-    function electCandidate() private returns (bool) {
+    function processElectedCandidate(uint candidate, uint votingRound) private {
+        // Set Candidate status -> elected
+        // Set the Round thwe candidate was elected in
+        // Transfer any second preference votes over the quota to the firstTransfer property of the other candidates
+        // Calculate remaining third preference votes (linked to second) to the secondTransfer array of the other candidates
     }
 
 }
